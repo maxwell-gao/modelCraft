@@ -1,0 +1,2385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Training Language Models via Neural Cellular Automata</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-hover: #181825;
+  --text: #e8e6e3;
+  --text-muted: #8a8693;
+  --accent: #c4f06e;
+  --accent-dim: #6a8a2a;
+  --accent2: #6ee0f0;
+  --accent3: #f0a06e;
+  --border: #2a2a3a;
+  --canvas-opacity: 0.12;
+  --callout-bg: linear-gradient(135deg, rgba(196,240,110,0.06), rgba(110,224,240,0.04));
+  --bar-scratch-bg: rgba(255,255,255,0.15);
+  --bar-scratch-text: #8a8693;
+  --bar-track-bg: rgba(255,255,255,0.04);
+  --cx-bar-track-bg: rgba(255,255,255,0.03);
+  --nca-btn-text: #e8e6e3;
+  --serif: 'Instrument Serif', Georgia, serif;
+  --sans: 'DM Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+[data-theme="light"] {
+  --bg: #f6f5f1;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f0efeb;
+  --text: #1a1a2e;
+  --text-muted: #6b6880;
+  --accent: #3d7a0a;
+  --accent-dim: #8ab84e;
+  --accent2: #0a7a8a;
+  --accent3: #b87020;
+  --border: #ddd8d0;
+  --canvas-opacity: 0.06;
+  --callout-bg: linear-gradient(135deg, rgba(61,122,10,0.06), rgba(10,122,138,0.04));
+  --bar-scratch-bg: rgba(0,0,0,0.1);
+  --bar-scratch-text: #6b6880;
+  --bar-track-bg: rgba(0,0,0,0.04);
+  --cx-bar-track-bg: rgba(0,0,0,0.04);
+  --nca-btn-text: #1a1a2e;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 17px;
+  overflow-x: hidden;
+}
+
+/* --- GRID CANVAS --- */
+#grid-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  z-index: 0;
+  opacity: var(--canvas-opacity);
+  pointer-events: none;
+}
+
+/* --- LAYOUT --- */
+.container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 28px;
+  position: relative;
+  z-index: 1;
+}
+
+/* --- HERO --- */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px 0 60px;
+  position: relative;
+}
+
+.hero-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--accent);
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards 0.2s;
+}
+
+.hero-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 36px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards 1s;
+}
+
+.hero-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 10px;
+  transition: all 0.25s;
+}
+
+.hero-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(196,240,110,0.05);
+}
+
+[data-theme="light"] .hero-link:hover {
+  background: rgba(61,122,10,0.05);
+}
+
+.hero-link svg {
+  flex-shrink: 0;
+}
+
+.hero h1 {
+  font-family: var(--serif);
+  font-size: clamp(42px, 7vw, 80px);
+  line-height: 1.05;
+  font-weight: 400;
+  color: var(--text);
+  margin-bottom: 32px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards 0.4s;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.hero-sub {
+  font-size: 19px;
+  color: var(--text-muted);
+  max-width: 560px;
+  line-height: 1.7;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards 0.6s;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 48px;
+  margin-top: 56px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards 0.8s;
+}
+
+.hero-stat .number {
+  font-family: var(--serif);
+  font-size: 48px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.hero-stat .label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-family: var(--mono);
+  letter-spacing: 0.5px;
+}
+
+.scroll-cue {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  animation: fadeUp 0.8s ease forwards 1s;
+}
+
+.scroll-cue span {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.scroll-cue .arrow {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--accent), transparent);
+  animation: pulse 2s ease infinite;
+}
+
+/* --- SECTIONS --- */
+section {
+  padding: 100px 0;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+h2 {
+  font-family: var(--serif);
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 400;
+  line-height: 1.15;
+  margin-bottom: 28px;
+}
+
+h3 {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  margin-bottom: 16px;
+  margin-top: 48px;
+}
+
+p { margin-bottom: 20px; color: var(--text-muted); }
+p strong { color: var(--text); font-weight: 500; }
+
+/* --- CALLOUT --- */
+.callout {
+  background: var(--callout-bg);
+  border-left: 3px solid var(--accent);
+  padding: 28px 32px;
+  margin: 36px 0;
+  border-radius: 0 12px 12px 0;
+  font-size: 18px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.callout em { color: var(--accent); font-style: italic; font-family: var(--serif); font-size: 20px; }
+
+/* --- INTERACTIVE NCA GRID --- */
+.nca-demo {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  margin: 40px 0;
+  text-align: center;
+}
+
+.nca-demo h4 {
+  font-family: var(--serif);
+  font-size: 20px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.nca-demo .subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.nca-grid-container {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.nca-grid-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.nca-grid-panel .panel-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nca-canvas {
+  border-radius: 8px;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+
+.nca-controls {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.nca-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--nca-btn-text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nca-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nca-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+/* --- THEME TOGGLE --- */
+.theme-toggle {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 100;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 50px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.theme-toggle:hover { border-color: var(--accent); }
+
+.theme-toggle .toggle-track {
+  width: 40px;
+  height: 22px;
+  background: var(--border);
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.3s;
+}
+
+.theme-toggle .toggle-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--text);
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s cubic-bezier(0.68, -0.2, 0.27, 1.2);
+}
+
+[data-theme="light"] .theme-toggle .toggle-thumb {
+  transform: translateX(18px);
+}
+
+.theme-toggle .toggle-icon {
+  font-size: 16px;
+  line-height: 1;
+  transition: opacity 0.3s;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.theme-toggle .icon-moon { display: flex; }
+.theme-toggle .icon-sun { display: none; }
+[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+[data-theme="light"] .theme-toggle .icon-sun { display: flex; }
+
+/* Smooth transition for theme change */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease !important;
+}
+
+.complexity-indicator {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 12px;
+}
+
+.complexity-indicator span { color: var(--accent); }
+
+/* --- BAR CHART --- */
+.chart-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  margin: 40px 0;
+}
+
+.chart-wrapper h4 {
+  font-family: var(--serif);
+  font-size: 20px;
+  margin-bottom: 24px;
+}
+
+.bar-group {
+  margin-bottom: 20px;
+}
+
+.bar-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.bar-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar-row-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.bar-track {
+  height: 26px;
+  background: var(--bar-track-bg);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  flex: 1;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+  width: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.bar-fill.nca { background: var(--accent); }
+.bar-fill.c4 { background: var(--accent2); }
+.bar-fill.dyck { background: var(--accent3); }
+.bar-fill.scratch { background: var(--bar-scratch-bg); }
+.bar-fill.scratch span { color: var(--bar-scratch-text); }
+
+/* --- VERTICAL BAR CHART --- */
+.vbar-chart {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.vbar-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vbar-panel-title {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.vbar-gain {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.vbar-area {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  height: 200px;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+}
+
+.vbar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+}
+
+.vbar-value {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.vbar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+  height: 0;
+}
+
+.vbar.scratch { background: var(--bar-scratch-bg); }
+.vbar.c4 { background: var(--accent2); }
+.vbar.dyck { background: var(--accent3); }
+.vbar.nca { background: var(--accent); }
+
+[data-theme="light"] .vbar.nca { background: #4a9e12; }
+[data-theme="light"] .vbar.c4 { background: #0a8a9e; }
+[data-theme="light"] .vbar.dyck { background: #b87020; }
+
+.vbar-method-labels {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.vbar-method-label {
+  width: 40px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .vbar-chart { gap: 8px; }
+  .vbar-area { height: 150px; gap: 4px; }
+  .vbar-col { width: 28px; }
+  .vbar-method-label { width: 28px; font-size: 8px; }
+  .vbar-value { font-size: 9px; }
+  .vbar-panel-title { font-size: 14px; }
+}
+
+/* --- CONVERGENCE LINE CHART --- */
+.convergence-panels {
+  display: flex;
+  gap: 8px;
+}
+
+.conv-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.conv-panel-title {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.conv-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.conv-grid { stroke: var(--border); stroke-width: 0.5; }
+.conv-axis { stroke: var(--border); stroke-width: 1; }
+.conv-label { fill: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+
+.conv-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke-dashoffset 2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.conv-line-scratch { stroke: var(--text-muted); opacity: 0.6; }
+.conv-line-c4 { stroke: var(--accent2); }
+.conv-line-nca { stroke: var(--accent); }
+.conv-line-dyck { stroke: var(--accent3); }
+.conv-line-c4lg { stroke: var(--accent2); }
+.conv-line-c4nr { stroke: var(--accent3); opacity: 0.7; }
+
+@media (max-width: 640px) {
+  .convergence-panels { flex-direction: column; gap: 16px; }
+}
+
+.conv-crosshair {
+  stroke: var(--text-muted);
+  stroke-width: 0.5;
+  stroke-dasharray: 3 3;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.conv-crosshair.visible { opacity: 0.6; }
+
+.conv-snap-dot {
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.conv-snap-dot.visible { opacity: 1; }
+.conv-snap-dot-scratch { stroke: var(--text-muted); fill: var(--bg); }
+.conv-snap-dot-c4 { stroke: var(--accent2); fill: var(--bg); }
+.conv-snap-dot-nca { stroke: var(--accent); fill: var(--bg); }
+.conv-snap-dot-dyck { stroke: var(--accent3); fill: var(--bg); }
+.conv-snap-dot-c4lg { stroke: var(--accent2); fill: var(--bg); }
+.conv-snap-dot-c4nr { stroke: var(--accent3); fill: var(--bg); }
+
+.conv-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.conv-tooltip.visible { opacity: 1; }
+
+.conv-tooltip-header {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+.conv-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.conv-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.conv-annot { opacity: 0; transition: opacity 0.6s ease; }
+.conv-annot-dash { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.5; }
+.conv-diamond { fill: var(--accent); stroke: var(--bg); stroke-width: 1.5; }
+.conv-annot-arrow { stroke: var(--accent); stroke-width: 1.5; fill: none; }
+.conv-annot-vline { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 2 2; opacity: 0.6; }
+.conv-arrowhead { fill: var(--accent); stroke: none; }
+.conv-annot-text { fill: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; }
+
+.chart-legend {
+  display: flex;
+  gap: 24px;
+  margin-top: 20px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-muted);
+}
+
+.chart-legend .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* --- FINDINGS GRID --- */
+.findings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 36px 0;
+}
+
+.finding-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  transition: all 0.3s ease;
+}
+
+.finding-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+}
+
+.finding-card .icon {
+  font-size: 28px;
+  margin-bottom: 14px;
+}
+
+.finding-card h4 {
+  font-family: var(--serif);
+  font-size: 19px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.finding-card p {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* --- PIPELINE --- */
+.pipeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 40px 0;
+  overflow-x: auto;
+  padding: 20px 0;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 160px;
+  text-align: center;
+}
+
+.pipeline-step .step-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  width: 100%;
+  transition: all 0.3s;
+}
+
+.pipeline-step .step-box:hover {
+  border-color: var(--accent);
+}
+
+.pipeline-step .step-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.pipeline-step .step-title {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.pipeline-step .step-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pipeline-arrow {
+  font-size: 20px;
+  color: var(--accent-dim);
+  min-width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* --- COMPLEXITY TOGGLE --- */
+.complexity-viz {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  margin: 40px 0;
+}
+
+.complexity-viz h4 {
+  font-family: var(--serif);
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.complexity-viz .subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.domain-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.domain-tab {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.domain-tab:hover { border-color: var(--accent); color: var(--text); }
+.domain-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+[data-theme="light"] .domain-tab.active { color: #fff; }
+
+[data-theme="light"] .finding-card { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+[data-theme="light"] .chart-wrapper { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+[data-theme="light"] .nca-demo { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+[data-theme="light"] .complexity-viz { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+[data-theme="light"] .pipeline-step .step-box { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+
+[data-theme="light"] .bar-fill.nca { background: #4a9e12; color: #fff; }
+[data-theme="light"] .bar-fill.c4 { background: #0a8a9e; color: #fff; }
+[data-theme="light"] .bar-fill.dyck { background: #b87020; color: #fff; }
+[data-theme="light"] .hero-stat .number { color: var(--accent); }
+[data-theme="light"] .callout em { color: var(--accent); }
+
+.complexity-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cx-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cx-bar-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cx-bar-track {
+  flex: 1;
+  height: 28px;
+  background: var(--cx-bar-track-bg);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cx-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* --- BIBTEX --- */
+.bibtex-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin: 24px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.bibtex-block pre {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+.copy-btn.copied { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+[data-theme="light"] .bibtex-block { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+
+/* --- FOOTER --- */
+footer {
+  padding: 80px 0 40px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  position: relative;
+  z-index: 1;
+}
+
+footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* --- DIVIDER --- */
+.divider {
+  width: 60px;
+  height: 1px;
+  background: var(--border);
+  margin: 0 auto 100px;
+}
+
+/* --- ANIMATIONS --- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 640px) {
+  .hero-stats { flex-direction: column; gap: 28px; }
+  .findings-grid { grid-template-columns: 1fr; }
+  .pipeline { flex-direction: column; }
+  .pipeline-arrow { transform: rotate(90deg); }
+  .nca-grid-container { flex-direction: column; align-items: center; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="grid-canvas"></canvas>
+
+<!-- THEME TOGGLE -->
+<div class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+  <span class="toggle-icon">
+    <span class="icon-moon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span class="icon-sun"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><line x1="8" y1="1" x2="8" y2="3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="8" y1="13" x2="8" y2="15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="1" y1="8" x2="3" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="13" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="3.05" y1="3.05" x2="4.46" y2="4.46" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="11.54" y1="11.54" x2="12.95" y2="12.95" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="3.05" y1="12.95" x2="4.46" y2="11.54" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="11.54" y1="4.46" x2="12.95" y2="3.05" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+  </span>
+  <div class="toggle-track"><div class="toggle-thumb"></div></div>
+</div>
+
+<div class="container">
+
+<!-- HERO -->
+<section class="hero visible">
+  <div class="hero-label">Research Paper Blog</div>
+  <h1>Training Language Models<br>via <em>Neural Cellular Automata</em></h1>
+  <p class="hero-sub">What if the path to smarter language models doesn't require more text — but synthetic data from abstract dynamical systems?</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="number">6%</div>
+      <div class="label">Perplexity gain</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">1.6×</div>
+      <div class="label">Faster convergence</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">164M</div>
+      <div class="label">NCA tokens used</div>
+    </div>
+  </div>
+  <div class="hero-links">
+    <a href="#" class="hero-link" target="_blank" rel="noopener">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+        <path d="M4 1h5.5L13 4.5V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <path d="M9 1v4h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <line x1="5.5" y1="8" x2="10.5" y2="8" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+        <line x1="5.5" y1="10.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+        <line x1="5.5" y1="13" x2="8.5" y2="13" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+      <span>Paper</span>
+    </a>
+    <a href="https://github.com/danihyunlee/nca-pre-pretraining" class="hero-link" target="_blank" rel="noopener">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+        <path d="M6 10.5L3.5 8 6 5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 5.5L12.5 8 10 10.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="8.5" y1="3.5" x2="7.5" y2="12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <span>Code</span>
+    </a>
+  </div>
+</section>
+
+<!-- THE PROBLEM -->
+<section id="problem">
+  <div class="section-label">01 — The Problem</div>
+  <h2>We're running out of text</h2>
+  <p>Large language models are hungry. They require exponentially more data to keep improving, and <strong>high-quality natural language is projected to run out by 2028</strong>. Worse, internet text carries human biases and entangles knowledge with reasoning, making it hard to control what models actually learn.</p>
+  <p>This raises a radical question: <strong>Is natural language the only path to intelligence?</strong></p>
+  <div class="callout">
+    The core hypothesis: what makes language useful for pre-training is its <em>structure</em>, not its semantics. If so, richly structured, non-linguistic data could also work.
+  </div>
+</section>
+
+<!-- THE APPROACH -->
+<section id="approach">
+  <div class="section-label">02 — The Approach</div>
+  <h2>Neural Cellular Automata as synthetic fuel</h2>
+  <p><strong>Neural cellular automata (NCA) generalize systems like Conway's Game of Life by replacing fixed rules with neural networks. Each randomly-sampled network defines a unique transition rule, producing diverse spatiotemporal dynamics on a grid. When unrolled over long horizons, these dynamics give rise to a rich spectrum of behaviors — from simple patterns that converge to a fixed attractor state to complex structures that emerge gradually over time.</p>
+
+  <!-- Interactive NCA Demo -->
+  <div class="nca-demo">
+    <h4>Interactive NCA Simulation</h4>
+    <p class="subtitle">Watch how different rules produce different complexity levels. Click to randomize.</p>
+    <div class="nca-grid-container">
+      <div class="nca-grid-panel">
+        <div class="panel-label">Low complexity</div>
+        <canvas class="nca-canvas" id="nca-low" width="120" height="120"></canvas>
+      </div>
+      <div class="nca-grid-panel">
+        <div class="panel-label">Medium complexity</div>
+        <canvas class="nca-canvas" id="nca-mid" width="120" height="120"></canvas>
+      </div>
+      <div class="nca-grid-panel">
+        <div class="panel-label">High complexity</div>
+        <canvas class="nca-canvas" id="nca-high" width="120" height="120"></canvas>
+      </div>
+    </div>
+    <div class="nca-controls">
+      <button class="nca-btn" onclick="randomizeNCAs()">↻ New Rules</button>
+      <button class="nca-btn" id="pause-btn" onclick="togglePause()">❚❚ Pause</button>
+    </div>
+    <div class="complexity-indicator">
+      gzip compression ratio controls complexity — <span>more compressible = simpler dynamics</span>
+    </div>
+  </div>
+
+  <p>These NCA trajectories are tokenized into sequences (using 2×2 patches, similar to vision transformers) and fed to a standard transformer with next-token prediction. The key: since every sequence has a <strong>unique latent rule</strong>, the model must infer that rule in-context to predict what comes next. This in-context learning ability underpins many of the key reasoning capabilities observed in language models.</p>
+
+  <!-- Pipeline -->
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="step-box">
+        <div class="step-num">Stage 1</div>
+        <div class="step-title">Pre-pre-train</div>
+        <div class="step-desc">164M NCA tokens<br>Synthetic dynamics</div>
+      </div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step">
+      <div class="step-box">
+        <div class="step-num">Stage 2</div>
+        <div class="step-title">Pre-train</div>
+        <div class="step-desc">Natural language<br>Web, math, code (4-13B tokens)</div>
+      </div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step">
+      <div class="step-box">
+        <div class="step-num">Stage 3</div>
+        <div class="step-title">Fine-tune</div>
+        <div class="step-desc">Task-specific<br>Instruction tuning (<1B tokens)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section id="results">
+  <div class="section-label">03 — Results</div>
+  <h2>The surprising payoff</h2>
+  <p>Under matched token budgets (164M tokens each), NCA pre-pre-training consistently <strong>outperforms from-scratch training, pre-pre-training on natural language (C4), and pre-pre-training on other synthetic data (Dyck) </strong> across web text, math, and code. The gains aren't just better convergence speed, but also better final perplexity.</p>
+
+  <div class="chart-wrapper" id="ppl-chart">
+    <h4>Final Perplexity by Domain (↓ lower is better)</h4>
+    <div class="vbar-chart">
+      <div class="vbar-panel">
+        <div class="vbar-panel-title">OpenWebText</div>
+        <div class="vbar-gain">NCA −5.7%</div>
+        <div class="vbar-area">
+          <div class="vbar-col">
+            <span class="vbar-value">14.66</span>
+            <div class="vbar scratch" data-height="189"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">14.69</span>
+            <div class="vbar c4" data-height="190"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">14.35</span>
+            <div class="vbar dyck" data-height="181"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">13.82</span>
+            <div class="vbar nca" data-height="166"></div>
+          </div>
+        </div>
+        <div class="vbar-method-labels">
+          <span class="vbar-method-label">Scr</span>
+          <span class="vbar-method-label">C4</span>
+          <span class="vbar-method-label">Dyck</span>
+          <span class="vbar-method-label">NCA</span>
+        </div>
+      </div>
+      <div class="vbar-panel">
+        <div class="vbar-panel-title">OpenWebMath</div>
+        <div class="vbar-gain">NCA −5.2%</div>
+        <div class="vbar-area">
+          <div class="vbar-col">
+            <span class="vbar-value">8.11</span>
+            <div class="vbar scratch" data-height="189"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">8.14</span>
+            <div class="vbar c4" data-height="190"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">7.91</span>
+            <div class="vbar dyck" data-height="179"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">7.70</span>
+            <div class="vbar nca" data-height="168"></div>
+          </div>
+        </div>
+        <div class="vbar-method-labels">
+          <span class="vbar-method-label">Scr</span>
+          <span class="vbar-method-label">C4</span>
+          <span class="vbar-method-label">Dyck</span>
+          <span class="vbar-method-label">NCA</span>
+        </div>
+      </div>
+      <div class="vbar-panel">
+        <div class="vbar-panel-title">CodeParrot</div>
+        <div class="vbar-gain">NCA −4.2%</div>
+        <div class="vbar-area">
+          <div class="vbar-col">
+            <span class="vbar-value">1.92</span>
+            <div class="vbar scratch" data-height="190"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">1.88</span>
+            <div class="vbar c4" data-height="182"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">1.85</span>
+            <div class="vbar dyck" data-height="176"></div>
+          </div>
+          <div class="vbar-col">
+            <span class="vbar-value">1.84</span>
+            <div class="vbar nca" data-height="174"></div>
+          </div>
+        </div>
+        <div class="vbar-method-labels">
+          <span class="vbar-method-label">Scr</span>
+          <span class="vbar-method-label">C4</span>
+          <span class="vbar-method-label">Dyck</span>
+          <span class="vbar-method-label">NCA</span>
+        </div>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--bar-scratch-bg)"></span>Scratch</span>
+      <span><span class="dot" style="background:var(--accent2)"></span>C4 (natural language)</span>
+      <span><span class="dot" style="background:var(--accent3)"></span>Dyck (synthetic)</span>
+      <span><span class="dot" style="background:var(--accent)"></span>NCA (synthetic)</span>
+    </div>
+  </div>
+
+  <div class="chart-wrapper" id="convergence-chart">
+    <h4>Validation Perplexity During Training</h4>
+    <div class="convergence-panels">
+      <div class="conv-panel">
+        <div class="conv-panel-title">OpenWebText</div>
+        <svg class="conv-svg" id="conv-owt" viewBox="0 0 360 240"></svg>
+      </div>
+      <div class="conv-panel">
+        <div class="conv-panel-title">OpenWebMath</div>
+        <svg class="conv-svg" id="conv-math" viewBox="0 0 360 240"></svg>
+      </div>
+      <div class="conv-panel">
+        <div class="conv-panel-title">CodeParrot</div>
+        <svg class="conv-svg" id="conv-code" viewBox="0 0 360 240"></svg>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--bar-scratch-bg)"></span>Scratch</span>
+      <span><span class="dot" style="background:var(--accent2)"></span>C4</span>
+      <span><span class="dot" style="background:var(--accent3)"></span>Dyck</span>
+      <span><span class="dot" style="background:var(--accent)"></span>NCA</span>
+    </div>
+  </div>
+
+  <p>These language modeling gains transfer to <strong>real reasoning benchmarks</strong>:</p>
+
+  <div class="chart-wrapper" id="bench-chart">
+    <h4>Reasoning Benchmark Performance</h4>
+    <div class="bar-group">
+      <div class="bar-label"><span>GSM8K (Math) (pass@1 accuracy)</span></div>
+      <div class="bar-rows">
+        <div class="bar-row"><span class="bar-row-label">Scratch</span><div class="bar-track"><div class="bar-fill scratch" data-width="87.6%" style="justify-content:flex-end;padding-right:10px"><span>3.82%</span></div></div></div>
+        <div class="bar-row"><span class="bar-row-label">C4</span><div class="bar-track"><div class="bar-fill c4" data-width="87.4%" style="justify-content:flex-end;padding-right:10px">3.81%</div></div></div>
+        <div class="bar-row"><span class="bar-row-label">Dyck</span><div class="bar-track"><div class="bar-fill dyck" data-width="94.0%" style="justify-content:flex-end;padding-right:10px">4.10%</div></div></div>
+        <div class="bar-row"><span class="bar-row-label">NCA</span><div class="bar-track"><div class="bar-fill nca" data-width="100%" style="justify-content:flex-end;padding-right:10px">4.36%</div></div></div>
+      </div>
+    </div>
+    <div class="bar-group">
+      <div class="bar-label"><span>HumanEval (Code) (pass@1 accuracy)</span></div>
+      <div class="bar-rows">
+        <div class="bar-row"><span class="bar-row-label">Scratch</span><div class="bar-track"><div class="bar-fill scratch" data-width="90.1%" style="justify-content:flex-end;padding-right:10px"><span>6.75%</span></div></div></div>
+        <div class="bar-row"><span class="bar-row-label">C4</span><div class="bar-track"><div class="bar-fill c4" data-width="83.7%" style="justify-content:flex-end;padding-right:10px">6.27%</div></div></div>
+        <div class="bar-row"><span class="bar-row-label">Dyck</span><div class="bar-track"><div class="bar-fill dyck" data-width="92.1%" style="justify-content:flex-end;padding-right:10px">6.90%</div></div></div>
+        <div class="bar-row"><span class="bar-row-label">NCA</span><div class="bar-track"><div class="bar-fill nca" data-width="100%" style="justify-content:flex-end;padding-right:10px">7.49%</div></div></div>
+      </div>
+    </div>
+    <div class="bar-group">
+      <div class="bar-label"><span>BigBench-Lite (Reasoning) (normalized accuracy pass@2)</span></div>
+      <div class="bar-rows">
+        <div class="bar-row"><span class="bar-row-label">Scratch</span><div class="bar-track"><div class="bar-fill scratch" data-width="78.9%" style="justify-content:flex-end;padding-right:10px"><span>20.91%</span></div></div></div>
+        <div class="bar-row"><span class="bar-row-label">C4</span><div class="bar-track"><div class="bar-fill c4" data-width="85.9%" style="justify-content:flex-end;padding-right:10px">22.76%</div></div></div>
+        <div class="bar-row"><span class="bar-row-label">Dyck</span><div class="bar-track"><div class="bar-fill dyck" data-width="68.3%" style="justify-content:flex-end;padding-right:10px">18.10%</div></div></div>
+        <div class="bar-row"><span class="bar-row-label">NCA</span><div class="bar-track"><div class="bar-fill nca" data-width="100%" style="justify-content:flex-end;padding-right:10px">26.51%</div></div></div>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--bar-scratch-bg)"></span>Scratch</span>
+      <span><span class="dot" style="background:var(--accent2)"></span>C4</span>
+      <span><span class="dot" style="background:var(--accent3)"></span>Dyck</span>
+      <span><span class="dot" style="background:var(--accent)"></span>NCA</span>
+    </div>
+  </div>
+
+  <p>Surprisingly, we observe that our non-linguistic NCA data outperforms natural language at equal scale. So, we investigate further: what happens if we give C4 <strong>~10× more data</strong>? We scale C4 pre-pre-training to 1.6B tokens while keeping NCA at 164M. Even with this data advantage, NCA still <strong></strong>converges 1.4x faster and achieves 5% better final perplexity </strong>.</p>
+
+  <div class="chart-wrapper" id="scale-chart">
+    <h4>OpenWebText: NCA (164M tokens) vs C4 (1.6B tokens)</h4>
+    <div class="conv-panel" style="max-width:640px;margin:0 auto">
+      <svg class="conv-svg" id="conv-scale" viewBox="0 0 560 300"></svg>
+    </div>
+    <div class="chart-legend">
+      <span><span class="dot" style="background:var(--bar-scratch-bg)"></span>Scratch</span>
+      <span><span class="dot" style="background:var(--accent)"></span>NCA (164M)</span>
+      <span><span class="dot" style="background:var(--accent3)"></span>Dyck (164M)</span>
+      <span><span class="dot" style="background:var(--accent2)"></span>C4 (1.6B)</span>
+      <span><span class="dot" style="background:var(--accent3)"></span>C4 (1.6B, no reinit)</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <em>164M tokens of automata beats 1.6B tokens of natural language.</em> We believe the difference reflects what each data source teaches at each scale . At 1.6B tokens — far below the compute-optimal scale — C4 largely teaches shallow, local patterns, while each NCA sequence trains the model to infer a latent rule from context (i.e., in-context learning) and apply it consistently. This per-token diversity in <em>functions</em>, rather than redundant linguistic patterns, appears more efficient at building the general-purpose representations that transfer to language.
+  </div>
+</section>
+
+<!-- INSIGHTS -->
+<section id="insights">
+  <div class="section-label">04 — Key Insights</div>
+  <h2>What drives the transfer?</h2>
+
+  <div class="findings-grid">
+    <div class="finding-card">
+      <div class="icon">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <rect x="2" y="6" width="8" height="14" rx="2" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+          <rect x="14" y="6" width="8" height="14" rx="2" stroke="var(--accent2)" stroke-width="1.5" fill="none"/>
+          <rect x="26" y="6" width="8" height="14" rx="2" stroke="var(--accent3)" stroke-width="1.5" fill="none"/>
+          <text x="6" y="15.5" font-family="var(--mono)" font-size="7" fill="var(--accent)" text-anchor="middle" font-weight="600">Q</text>
+          <text x="18" y="15.5" font-family="var(--mono)" font-size="7" fill="var(--accent2)" text-anchor="middle" font-weight="600">K</text>
+          <text x="30" y="15.5" font-family="var(--mono)" font-size="7" fill="var(--accent3)" text-anchor="middle" font-weight="600">V</text>
+          <path d="M6 22 L18 28 L30 22" stroke="var(--text-muted)" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="18" cy="31" r="2" fill="var(--accent)" opacity="0.7"/>
+        </svg>
+      </div>
+      <h4>Attention is the carrier</h4>
+      <p>Re-initialization experiments show attention layers capture the most transferable computational primitives. MLPs encode domain-specific knowledge — transferable only when source and target align.</p>
+    </div>
+    <div class="finding-card">
+      <div class="icon">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <circle cx="18" cy="18" r="14" stroke="var(--border)" stroke-width="1.5"/>
+          <circle cx="18" cy="18" r="14" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="44 44" stroke-dashoffset="-11" stroke-linecap="round"/>
+          <line x1="18" y1="18" x2="18" y2="8" stroke="var(--text)" stroke-width="1.5" stroke-linecap="round" transform="rotate(45 18 18)"/>
+          <circle cx="18" cy="18" r="2.5" fill="var(--accent)" opacity="0.8"/>
+          <text x="18" y="35" font-family="var(--mono)" font-size="5" fill="var(--text-muted)" text-anchor="middle">GZIP</text>
+        </svg>
+      </div>
+      <h4>Complexity must match</h4>
+      <p>The optimal NCA complexity varies by domain: code benefits from simpler dynamics, while math and web text prefer more complex ones. This opens a new lever for targeted training.</p>
+    </div>
+    <div class="finding-card">
+      <div class="icon">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <circle cx="8" cy="10" r="3" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+          <circle cx="28" cy="10" r="3" stroke="var(--accent2)" stroke-width="1.5" fill="none"/>
+          <circle cx="18" cy="28" r="3" stroke="var(--accent3)" stroke-width="1.5" fill="none"/>
+          <circle cx="28" cy="26" r="2.5" stroke="var(--text-muted)" stroke-width="1" fill="none"/>
+          <circle cx="8" cy="24" r="2.5" stroke="var(--text-muted)" stroke-width="1" fill="none"/>
+          <line x1="10.5" y1="11.5" x2="16" y2="26" stroke="var(--text-muted)" stroke-width="1" opacity="0.5"/>
+          <line x1="25.5" y1="11.5" x2="20" y2="26" stroke="var(--text-muted)" stroke-width="1" opacity="0.5"/>
+          <line x1="11" y1="10" x2="25" y2="10" stroke="var(--text-muted)" stroke-width="1" opacity="0.5"/>
+          <line x1="9.5" y1="22" x2="16" y2="27" stroke="var(--text-muted)" stroke-width="1" opacity="0.3"/>
+          <line x1="26" y1="24.5" x2="20.5" y2="27.5" stroke="var(--text-muted)" stroke-width="1" opacity="0.3"/>
+        </svg>
+      </div>
+      <h4>Structure, not semantics</h4>
+      <p>NCA data has zero linguistic content — yet teaches models to track long-range dependencies and infer latent rules, the same capabilities needed for language.</p>
+    </div>
+    <div class="finding-card">
+      <div class="icon">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <polyline points="4,28 10,22 16,24 22,14 28,16 34,6" stroke="var(--accent)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="4,28 10,26 16,27 22,24 28,23 34,22" stroke="var(--text-muted)" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2"/>
+          <circle cx="34" cy="6" r="2.5" fill="var(--accent)" opacity="0.7"/>
+          <line x1="4" y1="30" x2="34" y2="30" stroke="var(--border)" stroke-width="1"/>
+          <text x="19" y="35" font-family="var(--mono)" font-size="5" fill="var(--text-muted)" text-anchor="middle">tokens</text>
+        </svg>
+      </div>
+      <h4>Efficiency over scale</h4>
+      <p>More synthetic data isn't always better. Calibrating the complexity of the data generator matters more than raw volume, enabling smarter training with less compute.</p>
+    </div>
+  </div>
+
+  <!-- Complexity by Domain interactive -->
+  <div class="complexity-viz">
+    <h4>Optimal Complexity by Domain</h4>
+    <p class="subtitle">Click a domain to see which NCA complexity band transfers best</p>
+    <div class="domain-tabs">
+      <button class="domain-tab active" data-domain="webtext" onclick="switchDomain('webtext')">Web Text</button>
+      <button class="domain-tab" data-domain="math" onclick="switchDomain('math')">Math</button>
+      <button class="domain-tab" data-domain="code" onclick="switchDomain('code')">Code</button>
+    </div>
+    <div class="complexity-bars" id="complexity-bars">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- WHY IT WORKS -->
+<section id="why">
+  <div class="section-label">05 — Why It Works</div>
+  <h2>A purer training signal</h2>
+  <p>At small token budgets, natural language pre-training mostly teaches shallow patterns. Models exploit <strong>semantic shortcuts</strong> and co-occurrence priors rather than learning to reason from structure. On the other hand, NCA sequences do not contain any semantic shortcuts.</p>
+  <p>Every NCA trajectory is generated by a hidden transition rule — a randomly sampled neural network — that the model must infer purely from context. Since there's no semantic content to fall back on, every token pushes the model toward <strong>in-context rule inference</strong>: observing a sequence, hypothesizing the underlying rule, and applying it consistently forward. This mirrors one of the core capabilities of language models (i.e., in-context learning).</p>
+  <p>Because NCA rules are drawn from a universal class of computable functions — some realizing Turing-complete systems — the distribution is too vast to memorize. The model is forced to learn a <em>general mechanism</em> for rule inference rather than memorizing specific rules. This is supported by our empirical findings: <strong>attention layers</strong>, not the MLPs, carry the most transferable structure. Prior work shows that in-context learning ability emerges with the formation of <em>induction heads</em> —- attention circuits that copy and apply patterns from earlier in the sequence. NCA pre-pre-training exclusively rewards this behavior, likely inducing earlier and more robust formation of these circuits before language training begins.</p>
+  <!-- <p>A subtler motivation comes from the theory of <em>epiplexity</em>: even though NCAs are deterministic, a computationally bounded model cannot brute-force simulate them. Instead, it must learn coarse-grained representations — of gliders, collisions, emergent structures — that enable efficient prediction. Learning such representations over a diverse function class may bootstrap the same capacity needed to model the latent structure of natural language.</p> -->
+</section>
+
+<!-- IMPLICATIONS -->
+<section id="implications">
+  <div class="section-label">06 — The Big Picture</div>
+  <h2>Beyond one-size-fits-all</h2>
+  <p>This work opens a fundamentally new axis of control for training language models. Instead of treating the training distribution as fixed, we can <strong>tune the structure of synthetic data to match target domains</strong>. Simpler NCA rules for code, and richer long-range dynamics for genomic sequence modeling.</p>
+  <p>The long-term vision is: <strong>foundation models that acquire reasoning from fully synthetic data</strong>, then learn semantics from a small, curated corpus of natural language. This would help us build models that reason without inheriting human biases from inception.</p>
+  <div class="callout">
+    The question is no longer <em>whether</em> synthetic pre-training can work, but <em>how far it can go.</em>
+  </div>
+</section>
+
+<section id="cite">
+  <h2>Citation</h2>
+  <p>If you find this work useful, please consider citing our paper:</p>
+  <div class="bibtex-block">
+    <button class="copy-btn" onclick="copyBibtex()" id="copy-btn">Copy</button>
+<pre id="bibtex-text">@inproceedings{placeholder2026nca,
+  title={Training Language Models via Neural Cellular Automata},
+  author={Seungwook Han and Dan Lee and Akarsh Kumar and Pulkit Agrawal},
+  booktitle={TBD,
+  year={2026}
+}</pre>
+  </div>
+</section>
+
+</div>
+
+<div class="divider"></div>
+
+<footer>
+  <p>Paper: "Training Language Models via Neural Cellular Automata"</p>
+</footer>
+
+<script>
+// --- THEME TOGGLE ---
+function toggleTheme() {
+  const html = document.documentElement;
+  html.classList.add('theme-transition');
+  const current = html.getAttribute('data-theme');
+  const next = current === 'light' ? 'dark' : 'light';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  // Update NCA background cell color for light mode
+  updateNCAColors();
+  // Re-render complexity bars with theme-appropriate colors
+  const activeDomain = document.querySelector('.domain-tab.active')?.dataset.domain || 'webtext';
+  renderComplexity(activeDomain);
+  setTimeout(() => html.classList.remove('theme-transition'), 500);
+}
+
+// Respect system preference on load
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+
+function isLight() {
+  return document.documentElement.getAttribute('data-theme') === 'light';
+}
+
+function updateNCAColors() {
+  // NCA grid colors adapt slightly for readability
+  if (isLight()) {
+    ncaColors[0] = '#e8e6e3';
+  } else {
+    ncaColors[0] = '#0a0a0f';
+  }
+  ncas.forEach(n => n.draw());
+}
+
+// --- BACKGROUND GRID ANIMATION ---
+const canvas = document.getElementById('grid-canvas');
+const ctx = canvas.getContext('2d');
+let gridW, gridH;
+const cellSize = 18;
+const colors = ['#c4f06e', '#6ee0f0', '#f0a06e', '#a06ef0', '#f06ea0'];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gridW = Math.ceil(canvas.width / cellSize);
+  gridH = Math.ceil(canvas.height / cellSize);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+let bgGrid = [];
+function initBgGrid() {
+  bgGrid = [];
+  for (let y = 0; y < gridH; y++) {
+    bgGrid[y] = [];
+    for (let x = 0; x < gridW; x++) {
+      bgGrid[y][x] = Math.random() < 0.03 ? (1 + Math.floor(Math.random() * 4)) : 0;
+    }
+  }
+}
+initBgGrid();
+
+function stepBgGrid() {
+  const next = bgGrid.map(r => [...r]);
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const ny = (y + dy + gridH) % gridH;
+          const nx = (x + dx + gridW) % gridW;
+          if (bgGrid[ny][nx] > 0) n++;
+        }
+      if (bgGrid[y][x] === 0) {
+        if (n === 3) next[y][x] = 1 + Math.floor(Math.random() * 4);
+      } else {
+        if (n < 2 || n > 3) next[y][x] = 0;
+      }
+    }
+  }
+  bgGrid = next;
+}
+
+function drawBgGrid() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      if (bgGrid[y][x] > 0) {
+        ctx.fillStyle = colors[bgGrid[y][x] - 1];
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+let bgFrame = 0;
+function animBg() {
+  bgFrame++;
+  if (bgFrame % 8 === 0) {
+    stepBgGrid();
+    if (bgFrame % 200 === 0 && Math.random() < 0.3) {
+      const cx = Math.floor(Math.random() * gridW);
+      const cy = Math.floor(Math.random() * gridH);
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const ny = (cy + dy + gridH) % gridH;
+          const nx = (cx + dx + gridW) % gridW;
+          if (Math.random() < 0.5) bgGrid[ny][nx] = 1 + Math.floor(Math.random() * 4);
+        }
+    }
+  }
+  drawBgGrid();
+  requestAnimationFrame(animBg);
+}
+animBg();
+
+// --- NCA DEMO ---
+const ncaSize = 12;
+const ncaScale = 10;
+let ncaColors = [
+  '#0a0a0f','#c4f06e','#6ee0f0','#f0a06e','#a06ef0',
+  '#f06ea0','#6ef0b0','#f0e06e','#6e90f0','#e06ef0'
+];
+
+class SimpleNCA {
+  constructor(canvas, complexity) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.complexity = complexity;
+    this.grid = [];
+    this.weights = [];
+    this.init();
+  }
+  init() {
+    this.grid = [];
+    for (let y = 0; y < ncaSize; y++) {
+      this.grid[y] = [];
+      for (let x = 0; x < ncaSize; x++) {
+        this.grid[y][x] = Math.floor(Math.random() * 10);
+      }
+    }
+    // Random weights for a simple rule
+    this.weights = [];
+    const numW = this.complexity === 'low' ? 5 : this.complexity === 'mid' ? 6 : 15;
+    for (let i = 0; i < numW; i++) {
+      this.weights.push((Math.random() - 0.5) * (this.complexity === 'low' ? 1.5 : this.complexity === 'mid' ? 2 : 6));
+    }
+  }
+  step() {
+    const next = this.grid.map(r => [...r]);
+    for (let y = 0; y < ncaSize; y++) {
+      for (let x = 0; x < ncaSize; x++) {
+        let sum = 0;
+        let idx = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const ny = (y + dy + ncaSize) % ncaSize;
+            const nx = (x + dx + ncaSize) % ncaSize;
+            sum += this.grid[ny][nx] * (this.weights[idx % this.weights.length] || 0.1);
+            idx++;
+          }
+        }
+        if (this.complexity === 'low') {
+          // Regular: settles to a simple stable pattern
+          next[y][x] = Math.abs(Math.round(sum * 0.15 + this.grid[y][x] * 0.3)) % 10;
+        } else if (this.complexity === 'mid') {
+          next[y][x] = Math.abs(Math.round(sum * 0.2 + this.grid[y][x] * 0.7)) % 10;
+        } else {
+          next[y][x] = Math.abs(Math.round(sum * 0.5 + this.grid[y][x] * 0.7 + Math.sin(sum) * 2)) % 10;
+        }
+      }
+    }
+    this.grid = next;
+  }
+  draw() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    for (let y = 0; y < ncaSize; y++) {
+      for (let x = 0; x < ncaSize; x++) {
+        this.ctx.fillStyle = ncaColors[this.grid[y][x]];
+        this.ctx.fillRect(x * ncaScale, y * ncaScale, ncaScale - 1, ncaScale - 1);
+      }
+    }
+  }
+}
+
+const ncaLow = new SimpleNCA(document.getElementById('nca-low'), 'low');
+const ncaMid = new SimpleNCA(document.getElementById('nca-mid'), 'mid');
+const ncaHigh = new SimpleNCA(document.getElementById('nca-high'), 'high');
+const ncas = [ncaLow, ncaMid, ncaHigh];
+
+let ncaPaused = false;
+let ncaFrame = 0;
+
+function animNCA() {
+  ncaFrame++;
+  if (!ncaPaused && ncaFrame % 6 === 0) {
+    ncas.forEach(n => { n.step(); n.draw(); });
+  }
+  requestAnimationFrame(animNCA);
+}
+ncas.forEach(n => n.draw());
+updateNCAColors();
+animNCA();
+
+function randomizeNCAs() {
+  ncas.forEach(n => { n.init(); n.draw(); });
+}
+
+function togglePause() {
+  ncaPaused = !ncaPaused;
+  document.getElementById('pause-btn').textContent = ncaPaused ? '▶ Play' : '❚❚ Pause';
+}
+
+document.querySelectorAll('.nca-canvas').forEach(c => {
+  c.addEventListener('click', () => {
+    const nca = c.id === 'nca-low' ? ncaLow : c.id === 'nca-mid' ? ncaMid : ncaHigh;
+    nca.init();
+    nca.draw();
+  });
+});
+
+// --- COMPLEXITY DOMAIN VIZ ---
+function getCxColors() {
+  if (isLight()) {
+    return ['#b0cc90', '#8ab84e', '#5a9e20', '#3d7a0a'];
+  }
+  return ['#4a6a2a', '#6a8a2a', '#9ac04e', '#c4f06e'];
+}
+
+const complexityValues = {
+  webtext: [15, 35, 55, 95],
+  math: [20, 40, 55, 90],
+  code: [35, 95, 50, 25],
+};
+const complexityLabels = ['20-30%', '30-40%', '40-50%', '50%+'];
+
+function renderComplexity(domain) {
+  const bars = document.getElementById('complexity-bars');
+  const values = complexityValues[domain];
+  const colors = getCxColors();
+  const maxVal = Math.max(...values);
+  bars.innerHTML = values.map((v, i) => {
+    const isBest = v === maxVal;
+    return `
+    <div class="cx-bar-row">
+      <div class="cx-bar-label">${complexityLabels[i]}</div>
+      <div class="cx-bar-track">
+        <div class="cx-bar-fill" style="width:0%;background:${colors[i]};color:${isBest ? (isLight() ? '#fff' : '#0a0a0f') : (isLight() ? '#333' : '#ccc')}">
+          ${isBest ? '★ best' : ''}
+        </div>
+      </div>
+    </div>
+  `}).join('');
+  requestAnimationFrame(() => {
+    bars.querySelectorAll('.cx-bar-fill').forEach((el, i) => {
+      el.style.width = values[i] + '%';
+    });
+  });
+}
+
+function switchDomain(domain) {
+  document.querySelectorAll('.domain-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-domain="${domain}"]`).classList.add('active');
+  renderComplexity(domain);
+}
+
+renderComplexity('webtext');
+
+// --- COPY BIBTEX ---
+function copyBibtex() {
+  const text = document.getElementById('bibtex-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// --- SCROLL ANIMATIONS ---
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('visible');
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('section:not(.hero)').forEach(s => observer.observe(s));
+
+// --- CONVERGENCE CHART ---
+const CONV_BS = 512 * 1024;
+const convData = {
+  owt: {
+    scratch: { iter: [500,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [4.615,3.822,3.388,3.172,3.054,2.981,2.926,2.882,2.844,2.811,2.782,2.756,2.734,2.716,2.702,2.692,2.687,2.685,2.685] },
+    c4: { iter: [500,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [4.322,3.755,3.377,3.167,3.057,2.985,2.932,2.887,2.848,2.815,2.786,2.760,2.737,2.718,2.704,2.694,2.688,2.687,2.687] },
+    dyck: { iter: [500,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [4.559087313, 3.764611159, 3.347507755, 3.141557234, 3.031773582, 2.959412126, 2.905142911, 2.860257942, 2.822238708, 2.789851235, 2.760474909, 2.73505429, 2.713104983, 2.696512718, 2.680455806, 2.67118378, 2.66557215, 2.664575712, 2.664141228] },
+    nca: { iter: [500,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [4.514,3.700,3.311,3.114,2.995,2.923,2.867,2.823,2.785,2.752,2.723,2.697,2.675,2.656,2.642,2.633,2.627,2.626,2.626] }
+  },
+  math: {
+    scratch: { iter: [500,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000,6500,7000,7500,8000], loss: [3.316,2.817,2.625,2.509,2.418,2.351,2.298,2.254,2.217,2.183,2.155,2.130,2.112,2.100,2.094,2.093] },
+    c4: { iter: [500,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000,6500,7000,7500,8000], loss: [3.195,2.813,2.619,2.499,2.417,2.354,2.304,2.261,2.222,2.188,2.159,2.134,2.116,2.103,2.098,2.097] },
+    dyck: { iter: [500,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000,6500,7000,7500,8000], loss: [3.251119158, 2.776012956, 2.585123311, 2.468431876, 2.385050977, 2.322948472, 2.274501702, 2.231490421, 2.192543239, 2.159855326, 2.130281394, 2.10604501, 2.087474302, 2.075332472, 2.069596676, 2.068482774] },
+    nca: { iter: [500,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000,6500,7000,7500,8000], loss: [3.178,2.733,2.557,2.452,2.368,2.300,2.247,2.203,2.165,2.132,2.102,2.078,2.059,2.047,2.042,2.041] }
+  },
+  code: {
+    scratch: { iter: [3000,6000,9000,12000,15000,18000,21000,24000], loss: [0.914,0.817,0.766,0.729,0.702,0.680,0.669,0.653] },
+    c4: { iter: [3000,6000,9000,12000,15000,18000,21000,24000], loss: [0.914,0.803,0.748,0.708,0.675,0.653,0.637,0.634] },
+    dyck: { iter: [3000,6000,9000,12000,15000,18000,21000,24000], loss: [0.887881519, 0.782622679, 0.728269217, 0.689145653, 0.657536901, 0.633413128, 0.620146554, 0.615669746] },
+    nca: { iter: [3000,6000,9000,12000,15000,18000,21000,24000], loss: [0.876,0.775,0.720,0.681,0.651,0.628,0.614,0.610] }
+  }
+};
+
+const scaleData = {
+  scratch: { iter: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [3.822,3.388,3.172,3.054,2.981,2.926,2.882,2.844,2.811,2.782,2.756,2.734,2.716,2.702,2.692,2.687,2.685,2.685] },
+  nca: { iter: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [3.700,3.311,3.114,2.995,2.923,2.867,2.823,2.785,2.752,2.723,2.697,2.675,2.656,2.642,2.633,2.627,2.626,2.626] },
+  dyck: { iter: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [3.764611159, 3.347507755, 3.141557234, 3.031773582, 2.959412126, 2.905142911, 2.860257942, 2.822238708, 2.789851235, 2.760474909, 2.73505429, 2.713104983, 2.696512718, 2.680455806, 2.67118378, 2.66557215, 2.664575712, 2.664141228] },
+  c4lg: { iter: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [3.628,3.288,3.120,3.026,2.961,2.910,2.872,2.836,2.805,2.777,2.752,2.730,2.712,2.698,2.688,2.683,2.682,2.682] },
+  c4nr: { iter: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,17200], loss: [3.182,3.127,3.041,2.974,2.920,2.878,2.840,2.808,2.779,2.753,2.730,2.709,2.691,2.677,2.668,2.663,2.662,2.662] }
+};
+
+function convLogTicks(min, max) {
+  const ticks = [];
+  const subs = [1, 1.5, 2, 3, 5, 7];
+  for (let e = Math.floor(Math.log10(min)); e <= Math.ceil(Math.log10(max)); e++) {
+    for (const s of subs) {
+      const v = s * Math.pow(10, e);
+      if (v >= min && v <= max) ticks.push(v);
+    }
+  }
+  return ticks;
+}
+
+function convXTicks(min, max) {
+  const step = (max - min) / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(step)));
+  const r = step / mag;
+  const nice = r <= 1.5 ? mag : r <= 3.5 ? 2*mag : r <= 7.5 ? 5*mag : 10*mag;
+  const ticks = [];
+  let t = Math.ceil(min / nice) * nice;
+  while (t <= max) { ticks.push(t); t += nice; }
+  return ticks;
+}
+
+function fmtTokens(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(0) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(0) + 'M';
+  return (n/1e3).toFixed(0) + 'K';
+}
+
+const convPanels = {};
+
+function renderConvPanel(svgId, d, showYLabel) {
+  const svg = document.getElementById(svgId);
+  const ns = 'http://www.w3.org/2000/svg';
+  const M = {t:8, r:12, b:28, l: showYLabel ? 48 : 40};
+  const W = 360, H = 240;
+  const pW = W-M.l-M.r, pH = H-M.t-M.b;
+
+  let xAll=[], yAll=[];
+  ['scratch','c4','nca','dyck'].forEach(k => {
+    d[k].iter.forEach((it,i) => {
+      xAll.push(it * CONV_BS);
+      yAll.push(Math.exp(d[k].loss[i]));
+    });
+  });
+
+  const xMin = Math.min(...xAll), xMax = Math.max(...xAll);
+  const yMinR = Math.min(...yAll) * 0.97, yMaxR = Math.max(...yAll) * 1.03;
+  const lyMin = Math.log(yMinR), lyMax = Math.log(yMaxR);
+
+  const sx = x => M.l + (x - xMin) / (xMax - xMin) * pW;
+  const sy = y => M.t + (lyMax - Math.log(y)) / (lyMax - lyMin) * pH;
+
+  const mkEl = (tag, attrs) => {
+    const el = document.createElementNS(ns, tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+    return el;
+  };
+
+  svg.innerHTML = '';
+
+  const defs = mkEl('defs', {});
+  const clip = mkEl('clipPath', {id: svgId + '-clip'});
+  clip.appendChild(mkEl('rect', {x:M.l, y:M.t, width:pW, height:pH}));
+  defs.appendChild(clip);
+  svg.appendChild(defs);
+
+  // Y grid + labels
+  convLogTicks(yMinR, yMaxR).forEach(v => {
+    const y = sy(v);
+    svg.appendChild(mkEl('line', {x1:M.l, y1:y, x2:W-M.r, y2:y, class:'conv-grid'}));
+    const txt = mkEl('text', {x:M.l-5, y:y+3, 'text-anchor':'end', class:'conv-label'});
+    txt.textContent = v >= 10 ? v.toFixed(0) : v.toFixed(1);
+    svg.appendChild(txt);
+  });
+
+  // X ticks + labels
+  convXTicks(xMin, xMax).forEach(v => {
+    const x = sx(v);
+    svg.appendChild(mkEl('line', {x1:x, y1:M.t+pH, x2:x, y2:M.t+pH+4, class:'conv-grid'}));
+    const txt = mkEl('text', {x:x, y:H-8, 'text-anchor':'middle', class:'conv-label'});
+    txt.textContent = fmtTokens(v);
+    svg.appendChild(txt);
+  });
+
+  // Axes
+  svg.appendChild(mkEl('line', {x1:M.l, y1:M.t, x2:M.l, y2:M.t+pH, class:'conv-axis'}));
+  svg.appendChild(mkEl('line', {x1:M.l, y1:M.t+pH, x2:W-M.r, y2:M.t+pH, class:'conv-axis'}));
+
+  // Y axis label (first panel only)
+  if (showYLabel) {
+    const yLbl = mkEl('text', {x:12, y:M.t+pH/2, 'text-anchor':'middle', class:'conv-label', transform:'rotate(-90 12 '+(M.t+pH/2)+')'});
+    yLbl.textContent = 'Perplexity';
+    svg.appendChild(yLbl);
+  }
+
+  // Data lines
+  ['scratch','c4','nca','dyck'].forEach(method => {
+    const md = d[method];
+    const pts = md.iter.map((it,i) =>
+      sx(it * CONV_BS).toFixed(1) + ',' + sy(Math.exp(md.loss[i])).toFixed(1)
+    ).join(' ');
+    const poly = mkEl('polyline', {
+      points: pts,
+      'clip-path': 'url(#' + svgId + '-clip)',
+      class: 'conv-line conv-line-' + method
+    });
+    svg.appendChild(poly);
+    const len = poly.getTotalLength();
+    poly.style.strokeDasharray = len;
+    poly.style.strokeDashoffset = len;
+  });
+
+  // --- Speedup annotations ---
+  const scratchFinal = Math.exp(d.scratch.loss[d.scratch.loss.length - 1]);
+  const xFinal = d.scratch.iter[d.scratch.iter.length - 1] * CONV_BS;
+  const ncaPPL = d.nca.loss.map(l => Math.exp(l));
+  const ncaIters = d.nca.iter;
+  let crossingTokens = null;
+
+  for (let i = ncaPPL.length - 1; i > 0; i--) {
+    if (ncaPPL[i] <= scratchFinal && ncaPPL[i-1] > scratchFinal) {
+      const t = (scratchFinal - ncaPPL[i-1]) / (ncaPPL[i] - ncaPPL[i-1]);
+      crossingTokens = (ncaIters[i-1] + t * (ncaIters[i] - ncaIters[i-1])) * CONV_BS;
+      break;
+    }
+  }
+  if (crossingTokens === null && ncaPPL[0] <= scratchFinal) {
+    crossingTokens = ncaIters[0] * CONV_BS;
+  }
+
+  if (crossingTokens !== null) {
+    const speedup = xFinal / crossingTokens;
+    const scratchY = sy(scratchFinal);
+    const crossX = sx(Math.max(crossingTokens, xMin));
+    const finalX = sx(xFinal);
+    const clipRef = 'url(#' + svgId + '-clip)';
+
+    // Annotation group (fades in after lines draw)
+    const ag = mkEl('g', {class: 'conv-annot'});
+
+    // Horizontal dashed line at scratch final perplexity
+    ag.appendChild(mkEl('line', {
+      x1: sx(xMin), y1: scratchY, x2: finalX, y2: scratchY,
+      class: 'conv-annot-dash', 'clip-path': clipRef
+    }));
+
+    // Diamond marker at NCA crossing point
+    const ds = 5;
+    ag.appendChild(mkEl('polygon', {
+      points: crossX+','+( scratchY-ds)+' '+(crossX+ds)+','+scratchY+' '+crossX+','+(scratchY+ds)+' '+(crossX-ds)+','+scratchY,
+      class: 'conv-diamond', 'clip-path': clipRef
+    }));
+
+    // Arrow positioned at 15% from top of plot area
+    const arrowY = M.t + pH * 0.15;
+
+    // Vertical dotted line from diamond up to arrow
+    ag.appendChild(mkEl('line', {
+      x1: crossX, y1: scratchY, x2: crossX, y2: arrowY,
+      class: 'conv-annot-vline'
+    }));
+
+    // Horizontal arrow line
+    ag.appendChild(mkEl('line', {
+      x1: crossX, y1: arrowY, x2: finalX, y2: arrowY,
+      class: 'conv-annot-arrow'
+    }));
+
+    // Left arrowhead
+    ag.appendChild(mkEl('polygon', {
+      points: crossX+','+arrowY+' '+(crossX+6)+','+(arrowY-3.5)+' '+(crossX+6)+','+(arrowY+3.5),
+      class: 'conv-arrowhead'
+    }));
+
+    // Right arrowhead
+    ag.appendChild(mkEl('polygon', {
+      points: finalX+','+arrowY+' '+(finalX-6)+','+(arrowY-3.5)+' '+(finalX-6)+','+(arrowY+3.5),
+      class: 'conv-arrowhead'
+    }));
+
+    // Speedup text
+    const spTxt = mkEl('text', {
+      x: (crossX + finalX) / 2, y: arrowY - 6,
+      'text-anchor': 'middle', class: 'conv-annot-text'
+    });
+    spTxt.textContent = speedup.toFixed(1) + '\u00D7 faster';
+    ag.appendChild(spTxt);
+
+    svg.appendChild(ag);
+  }
+
+  // --- Interactive hover ---
+
+  // Build snap points (all unique iterations across methods)
+  const allIters = new Set();
+  ['scratch','c4','nca','dyck'].forEach(k => d[k].iter.forEach(it => allIters.add(it)));
+  const sortedIters = [...allIters].sort((a,b) => a-b);
+
+  const lookup = {};
+  ['scratch','c4','nca','dyck'].forEach(k => {
+    lookup[k] = {};
+    d[k].iter.forEach((it,i) => { lookup[k][it] = Math.exp(d[k].loss[i]); });
+  });
+
+  const snapPoints = sortedIters.map(it => {
+    const sp = { tokens: it * CONV_BS, x: sx(it * CONV_BS) };
+    ['scratch','c4','nca','dyck'].forEach(k => {
+      sp[k] = lookup[k][it] !== undefined
+        ? { ppl: lookup[k][it], y: sy(lookup[k][it]) }
+        : null;
+    });
+    return sp;
+  });
+
+  // Crosshair line
+  const crosshair = mkEl('line', {x1:0, y1:M.t, x2:0, y2:M.t+pH, class:'conv-crosshair'});
+  svg.appendChild(crosshair);
+
+  // Snap dots
+  const dots = {};
+  ['scratch','c4','nca','dyck'].forEach(k => {
+    dots[k] = mkEl('circle', {cx:0, cy:0, r:4, class:'conv-snap-dot conv-snap-dot-'+k});
+    svg.appendChild(dots[k]);
+  });
+
+  // Invisible overlay for mouse capture
+  const overlay = mkEl('rect', {x:M.l, y:M.t, width:pW, height:pH, fill:'transparent', style:'cursor:crosshair'});
+  svg.appendChild(overlay);
+
+  // Tooltip element
+  const panel = svg.parentElement;
+  const tooltip = document.createElement('div');
+  tooltip.className = 'conv-tooltip';
+  panel.appendChild(tooltip);
+
+  // Store state
+  convPanels[svgId] = { svg, snapPoints, crosshair, dots, tooltip, M, W, H,
+    methods: ['scratch','c4','nca','dyck'],
+    names: {scratch:'Scratch', c4:'C4', nca:'NCA', dyck:'Dyck'},
+    colors: {scratch:'var(--text-muted)', c4:'var(--accent2)', nca:'var(--accent)', dyck:'var(--accent3)'}
+  };
+
+  // Attach events
+  overlay.addEventListener('mousemove', e => convHover(svgId, e));
+  overlay.addEventListener('mouseleave', () => convLeave(svgId));
+}
+
+function convHover(svgId, evt) {
+  const p = convPanels[svgId];
+  const {svg, snapPoints, crosshair, dots, tooltip, W, H} = p;
+  const methods = p.methods;
+  const names = p.names;
+  const clrs = p.colors;
+
+  // Convert mouse position to SVG coordinates
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX;
+  pt.y = evt.clientY;
+  const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+  // Find nearest snap point by x distance
+  let nearest = snapPoints[0], minDist = Infinity;
+  snapPoints.forEach(sp => {
+    const dist = Math.abs(sp.x - svgPt.x);
+    if (dist < minDist) { minDist = dist; nearest = sp; }
+  });
+
+  // Update crosshair
+  crosshair.setAttribute('x1', nearest.x);
+  crosshair.setAttribute('x2', nearest.x);
+  crosshair.classList.add('visible');
+
+  // Update dots
+  methods.forEach(k => {
+    if (nearest[k]) {
+      dots[k].setAttribute('cx', nearest.x);
+      dots[k].setAttribute('cy', nearest[k].y);
+      dots[k].classList.add('visible');
+    } else {
+      dots[k].classList.remove('visible');
+    }
+  });
+
+  // Build tooltip HTML — sort by descending perplexity (top to bottom on chart)
+  let html = '<div class="conv-tooltip-header">' + fmtTokens(nearest.tokens) + ' tokens</div>';
+  const sortedMethods = methods.filter(k => nearest[k])
+    .sort((a, b) => nearest[b].ppl - nearest[a].ppl);
+  sortedMethods.forEach(k => {
+    html += '<div class="conv-tooltip-row">'
+      + '<div class="conv-tooltip-dot" style="background:' + clrs[k] + '"></div>'
+      + names[k] + ': ' + nearest[k].ppl.toFixed(2)
+      + '</div>';
+  });
+  tooltip.innerHTML = html;
+  tooltip.classList.add('visible');
+
+  // Position tooltip relative to panel
+  const svgRect = svg.getBoundingClientRect();
+  const panelRect = svg.parentElement.getBoundingClientRect();
+  const svgOffX = svgRect.left - panelRect.left;
+  const svgOffY = svgRect.top - panelRect.top;
+
+  let tipX = svgOffX + (nearest.x / W) * svgRect.width + 12;
+  let tipY = svgOffY + (svgPt.y / H) * svgRect.height - 20;
+
+  // Flip to left side if near right edge
+  const tipW = tooltip.offsetWidth;
+  if (tipX + tipW > panelRect.width) {
+    tipX = svgOffX + (nearest.x / W) * svgRect.width - tipW - 12;
+  }
+  // Clamp vertically
+  tipY = Math.max(0, Math.min(tipY, panelRect.height - tooltip.offsetHeight));
+
+  tooltip.style.left = tipX + 'px';
+  tooltip.style.top = tipY + 'px';
+}
+
+function convLeave(svgId) {
+  const p = convPanels[svgId];
+  p.crosshair.classList.remove('visible');
+  p.methods.forEach(k => p.dots[k].classList.remove('visible'));
+  p.tooltip.classList.remove('visible');
+}
+
+renderConvPanel('conv-owt', convData.owt, true);
+renderConvPanel('conv-math', convData.math, false);
+renderConvPanel('conv-code', convData.code, false);
+
+// --- SCALE CHART (NCA 160M vs C4 1.6B) ---
+function renderScaleChart(svgId, d) {
+  const svg = document.getElementById(svgId);
+  const ns = 'http://www.w3.org/2000/svg';
+  const M = {t:10, r:58, b:30, l:50};
+  const W = 560, H = 300;
+  const pW = W-M.l-M.r, pH = H-M.t-M.b;
+  const methods = ['scratch','nca','dyck','c4lg','c4nr'];
+
+  let xAll=[], yAll=[];
+  methods.forEach(k => {
+    d[k].iter.forEach((it,i) => {
+      xAll.push(it * CONV_BS);
+      yAll.push(Math.exp(d[k].loss[i]));
+    });
+  });
+
+  const xMin = Math.min(...xAll), xMax = Math.max(...xAll);
+  const yMinR = Math.min(...yAll) * 0.97, yMaxR = Math.max(...yAll) * 1.03;
+  const lyMin = Math.log(yMinR), lyMax = Math.log(yMaxR);
+
+  const sx = x => M.l + (x - xMin) / (xMax - xMin) * pW;
+  const sy = y => M.t + (lyMax - Math.log(y)) / (lyMax - lyMin) * pH;
+
+  const mkEl = (tag, attrs) => {
+    const el = document.createElementNS(ns, tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+    return el;
+  };
+
+  svg.innerHTML = '';
+
+  const defs = mkEl('defs', {});
+  const clip = mkEl('clipPath', {id: svgId + '-clip'});
+  clip.appendChild(mkEl('rect', {x:M.l, y:M.t, width:pW, height:pH}));
+  defs.appendChild(clip);
+  svg.appendChild(defs);
+
+  // Y grid + labels
+  convLogTicks(yMinR, yMaxR).forEach(v => {
+    const y = sy(v);
+    svg.appendChild(mkEl('line', {x1:M.l, y1:y, x2:M.l+pW, y2:y, class:'conv-grid'}));
+    const txt = mkEl('text', {x:M.l-5, y:y+3, 'text-anchor':'end', class:'conv-label'});
+    txt.textContent = v >= 10 ? v.toFixed(0) : v.toFixed(1);
+    svg.appendChild(txt);
+  });
+
+  // X ticks + labels
+  convXTicks(xMin, xMax).forEach(v => {
+    const x = sx(v);
+    svg.appendChild(mkEl('line', {x1:x, y1:M.t+pH, x2:x, y2:M.t+pH+4, class:'conv-grid'}));
+    const txt = mkEl('text', {x:x, y:H-8, 'text-anchor':'middle', class:'conv-label'});
+    txt.textContent = fmtTokens(v);
+    svg.appendChild(txt);
+  });
+
+  // Axes
+  svg.appendChild(mkEl('line', {x1:M.l, y1:M.t, x2:M.l, y2:M.t+pH, class:'conv-axis'}));
+  svg.appendChild(mkEl('line', {x1:M.l, y1:M.t+pH, x2:M.l+pW, y2:M.t+pH, class:'conv-axis'}));
+
+  // Y axis label
+  const yLbl = mkEl('text', {x:14, y:M.t+pH/2, 'text-anchor':'middle', class:'conv-label', transform:'rotate(-90 14 '+(M.t+pH/2)+')'});
+  yLbl.textContent = 'Perplexity';
+  svg.appendChild(yLbl);
+
+  // Data lines
+  methods.forEach(method => {
+    const md = d[method];
+    const pts = md.iter.map((it,i) =>
+      sx(it * CONV_BS).toFixed(1) + ',' + sy(Math.exp(md.loss[i])).toFixed(1)
+    ).join(' ');
+    const poly = mkEl('polyline', {
+      points: pts,
+      'clip-path': 'url(#' + svgId + '-clip)',
+      class: 'conv-line conv-line-' + method
+    });
+    svg.appendChild(poly);
+    const len = poly.getTotalLength();
+    poly.style.strokeDasharray = len;
+    poly.style.strokeDashoffset = len;
+  });
+
+  // --- Annotations ---
+  const c4lgFinal = Math.exp(d.c4lg.loss[d.c4lg.loss.length - 1]);
+  const ncaFinal = Math.exp(d.nca.loss[d.nca.loss.length - 1]);
+  const xFinal = d.nca.iter[d.nca.iter.length - 1] * CONV_BS;
+  const finalX = sx(xFinal);
+  const ncaPPL = d.nca.loss.map(l => Math.exp(l));
+  const ncaIters = d.nca.iter;
+  let crossingTokens = null;
+
+  for (let i = ncaPPL.length - 1; i > 0; i--) {
+    if (ncaPPL[i] <= c4lgFinal && ncaPPL[i-1] > c4lgFinal) {
+      const t = (c4lgFinal - ncaPPL[i-1]) / (ncaPPL[i] - ncaPPL[i-1]);
+      crossingTokens = (ncaIters[i-1] + t * (ncaIters[i] - ncaIters[i-1])) * CONV_BS;
+      break;
+    }
+  }
+  if (crossingTokens === null && ncaPPL[0] <= c4lgFinal) {
+    crossingTokens = ncaIters[0] * CONV_BS;
+  }
+
+  const clipRef = 'url(#' + svgId + '-clip)';
+  const ag = mkEl('g', {class: 'conv-annot'});
+
+  if (crossingTokens !== null) {
+    const speedup = xFinal / crossingTokens;
+    const c4lgY = sy(c4lgFinal);
+    const crossX = sx(Math.max(crossingTokens, xMin));
+
+    // Horizontal dashed line at C4 1.6B final perplexity
+    ag.appendChild(mkEl('line', {
+      x1: sx(xMin), y1: c4lgY, x2: finalX, y2: c4lgY,
+      class: 'conv-annot-dash', 'clip-path': clipRef
+    }));
+
+    // Diamond marker at NCA crossing point
+    const ds = 5;
+    ag.appendChild(mkEl('polygon', {
+      points: crossX+','+(c4lgY-ds)+' '+(crossX+ds)+','+c4lgY+' '+crossX+','+(c4lgY+ds)+' '+(crossX-ds)+','+c4lgY,
+      class: 'conv-diamond', 'clip-path': clipRef
+    }));
+
+    // Arrow at 15% from top
+    const arrowY = M.t + pH * 0.15;
+
+    // Vertical dotted line from diamond to arrow
+    ag.appendChild(mkEl('line', {
+      x1: crossX, y1: c4lgY, x2: crossX, y2: arrowY,
+      class: 'conv-annot-vline'
+    }));
+
+    // Horizontal arrow
+    ag.appendChild(mkEl('line', {
+      x1: crossX, y1: arrowY, x2: finalX, y2: arrowY,
+      class: 'conv-annot-arrow'
+    }));
+
+    // Arrowheads
+    ag.appendChild(mkEl('polygon', {
+      points: crossX+','+arrowY+' '+(crossX+6)+','+(arrowY-3.5)+' '+(crossX+6)+','+(arrowY+3.5),
+      class: 'conv-arrowhead'
+    }));
+    ag.appendChild(mkEl('polygon', {
+      points: finalX+','+arrowY+' '+(finalX-6)+','+(arrowY-3.5)+' '+(finalX-6)+','+(arrowY+3.5),
+      class: 'conv-arrowhead'
+    }));
+
+    // Speedup text
+    const spTxt = mkEl('text', {
+      x: (crossX + finalX) / 2, y: arrowY - 6,
+      'text-anchor': 'middle', class: 'conv-annot-text'
+    });
+    spTxt.textContent = speedup.toFixed(1) + '\u00D7 faster';
+    ag.appendChild(spTxt);
+  }
+
+  // Improvement bracket on the right
+  const ncaY = sy(ncaFinal);
+  const c4lgBracketY = sy(c4lgFinal);
+  const improvement = ((c4lgFinal - ncaFinal) / c4lgFinal * 100);
+  const bracketX = finalX + 10;
+
+  // Vertical bracket line
+  ag.appendChild(mkEl('line', {
+    x1: bracketX, y1: ncaY, x2: bracketX, y2: c4lgBracketY,
+    stroke: 'var(--accent)', 'stroke-width': '1.5'
+  }));
+  // Top cap
+  ag.appendChild(mkEl('line', {
+    x1: finalX + 3, y1: c4lgBracketY, x2: bracketX, y2: c4lgBracketY,
+    stroke: 'var(--accent)', 'stroke-width': '1.5'
+  }));
+  // Bottom cap
+  ag.appendChild(mkEl('line', {
+    x1: finalX + 3, y1: ncaY, x2: bracketX, y2: ncaY,
+    stroke: 'var(--accent)', 'stroke-width': '1.5'
+  }));
+  // Improvement text
+  const midY = (ncaY + c4lgBracketY) / 2;
+  const impTxt = mkEl('text', {
+    x: bracketX + 5, y: midY,
+    'text-anchor': 'start', 'dominant-baseline': 'middle',
+    class: 'conv-annot-text'
+  });
+  impTxt.textContent = improvement.toFixed(0) + '% better';
+  ag.appendChild(impTxt);
+
+  svg.appendChild(ag);
+
+  // --- Interactive hover ---
+  const allIters = new Set();
+  methods.forEach(k => d[k].iter.forEach(it => allIters.add(it)));
+  const sortedIters = [...allIters].sort((a,b) => a-b);
+
+  const lookup = {};
+  methods.forEach(k => {
+    lookup[k] = {};
+    d[k].iter.forEach((it,i) => { lookup[k][it] = Math.exp(d[k].loss[i]); });
+  });
+
+  const snapPoints = sortedIters.map(it => {
+    const sp = { tokens: it * CONV_BS, x: sx(it * CONV_BS) };
+    methods.forEach(k => {
+      sp[k] = lookup[k][it] !== undefined
+        ? { ppl: lookup[k][it], y: sy(lookup[k][it]) }
+        : null;
+    });
+    return sp;
+  });
+
+  // Crosshair
+  const crosshair = mkEl('line', {x1:0, y1:M.t, x2:0, y2:M.t+pH, class:'conv-crosshair'});
+  svg.appendChild(crosshair);
+
+  // Snap dots
+  const dots = {};
+  methods.forEach(k => {
+    dots[k] = mkEl('circle', {cx:0, cy:0, r:4, class:'conv-snap-dot conv-snap-dot-'+k});
+    svg.appendChild(dots[k]);
+  });
+
+  // Overlay
+  const overlay = mkEl('rect', {x:M.l, y:M.t, width:pW, height:pH, fill:'transparent', style:'cursor:crosshair'});
+  svg.appendChild(overlay);
+
+  // Tooltip
+  const panel = svg.parentElement;
+  const tooltip = document.createElement('div');
+  tooltip.className = 'conv-tooltip';
+  panel.appendChild(tooltip);
+
+  convPanels[svgId] = { svg, snapPoints, crosshair, dots, tooltip, M, W, H,
+    methods: methods,
+    names: {scratch:'Scratch', nca:'NCA (160M)', dyck:'Dyck (164M)', c4lg:'C4 (1.6B)', c4nr:'C4 (1.6B, no reinit)'},
+    colors: {scratch:'var(--text-muted)', nca:'var(--accent)', dyck:'var(--accent3)', c4lg:'var(--accent2)', c4nr:'var(--accent3)'}
+  };
+
+  overlay.addEventListener('mousemove', e => convHover(svgId, e));
+  overlay.addEventListener('mouseleave', () => convLeave(svgId));
+}
+
+renderScaleChart('conv-scale', scaleData);
+
+// --- BAR CHART ANIMATION ---
+const barObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.width;
+      });
+      e.target.querySelectorAll('.vbar').forEach(bar => {
+        bar.style.height = bar.dataset.height + 'px';
+      });
+      e.target.querySelectorAll('.conv-line').forEach(line => {
+        line.style.strokeDashoffset = '0';
+      });
+      // Fade in annotations after lines finish drawing
+      e.target.querySelectorAll('.conv-annot').forEach(g => {
+        setTimeout(() => { g.style.opacity = '1'; }, 1800);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.chart-wrapper').forEach(c => barObserver.observe(c));
+</script>
+
+</body>
+</html>
