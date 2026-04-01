@@ -91,3 +91,7 @@ select = ["E", "F", "I", "W"]
 dev = [
     "accelerate>=1.12.0",
 ]
+
+[[tool.uv.index]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
